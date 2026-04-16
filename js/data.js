@@ -85,35 +85,49 @@ function getFocoHistory(focoId) {
 
 // ── Internal helpers ───────────────────────────────────────
 
-async function fetchTab(sheetId, tabName) {
-  const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(tabName)}`;
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw new Error(`Error fetching tab "${tabName}": HTTP ${res.status}. Verifica que la Sheet está publicada.`);
-  }
-  const text = await res.text();
-  return parseGviz(text);
+/**
+ * Fetches a Google Sheets tab using JSONP (via <script> tag).
+ * Required because the gviz endpoint does not include CORS headers,
+ * so fetch() is blocked by browsers from cross-origin pages.
+ */
+function fetchTab(sheetId, tabName) {
+  return new Promise((resolve, reject) => {
+    // Unique callback name to avoid collisions if called in parallel
+    const cbName = '__gviz_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+    const scriptId = cbName;
+
+    const cleanup = () => {
+      delete window[cbName];
+      const s = document.getElementById(scriptId);
+      if (s) s.remove();
+    };
+
+    window[cbName] = (response) => {
+      cleanup();
+      if (!response || !response.table) {
+        reject(new Error(`Tab "${tabName}" no encontrada o sin datos. Verifica que la Sheet está publicada y compartida.`));
+        return;
+      }
+      resolve(parseGvizTable(response.table));
+    };
+
+    const script = document.createElement('script');
+    script.id = scriptId;
+    script.onerror = () => {
+      cleanup();
+      reject(new Error(`No se pudo cargar "${tabName}". Verifica que la Sheet está publicada.`));
+    };
+    // tqx handler parameter tells gviz to call our function instead of google.visualization.Query.setResponse
+    script.src = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json;handler:${cbName}&sheet=${encodeURIComponent(tabName)}`;
+    document.head.appendChild(script);
+  });
 }
 
-function parseGviz(text) {
-  // Strip JSONP wrapper: /*O_o*/\ngoogle.visualization.Query.setResponse({...});
-  // Use regex for robustness
-  const match = text.match(/google\.visualization\.Query\.setResponse\((.+)\);?\s*$/s);
-  if (!match) throw new Error('Respuesta inesperada de Google Sheets. Verifica que la Sheet esté publicada correctamente.');
+function parseGvizTable(table) {
+  const cols  = table.cols.map(c => (c.label || c.id).trim().toLowerCase());
+  const types = table.cols.map(c => c.type);
 
-  let data;
-  try {
-    data = JSON.parse(match[1]);
-  } catch {
-    throw new Error('No se pudo parsear la respuesta de Google Sheets.');
-  }
-
-  if (!data.table) return [];
-
-  const cols  = data.table.cols.map(c => (c.label || c.id).trim().toLowerCase());
-  const types = data.table.cols.map(c => c.type);
-
-  return (data.table.rows || []).map(row => {
+  return (table.rows || []).map(row => {
     const obj = {};
     row.c.forEach((cell, i) => {
       if (!cell) { obj[cols[i]] = null; return; }
