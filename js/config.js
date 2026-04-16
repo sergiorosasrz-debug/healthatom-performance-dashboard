@@ -12,6 +12,13 @@ const CONFIG = {
     focos:  'KPIs_Focos',
   },
 
+  // Sheet tab GIDs — find them in the URL when clicking each tab
+  // e.g. /edit?gid=0#gid=0  →  GID is "0"
+  GIDS: {
+    global: '0',
+    focos:  '760951471',
+  },
+
   // ── Strategic Focuses (Foco × 11) ─────────────────────────
   FOCOS: [
     // Dentalink

@@ -21,8 +21,8 @@ async function loadData(forceRefresh = false) {
   }
 
   const [globalRaw, focosRaw] = await Promise.all([
-    fetchTab(sheetId, CONFIG.TABS.global),
-    fetchTab(sheetId, CONFIG.TABS.focos),
+    fetchTab(sheetId, CONFIG.GIDS.global),
+    fetchTab(sheetId, CONFIG.GIDS.focos),
   ]);
 
   const globalData = normalizeRows(globalRaw);
@@ -86,60 +86,59 @@ function getFocoHistory(focoId) {
 // ── Internal helpers ───────────────────────────────────────
 
 /**
- * Fetches a Google Sheets tab using JSONP (via <script> tag).
- * Required because the gviz endpoint does not include CORS headers,
- * so fetch() is blocked by browsers from cross-origin pages.
+ * Fetches a Google Sheets tab via CSV export URL.
+ * The CSV export endpoint includes Access-Control-Allow-Origin: * so fetch() works.
  */
-function fetchTab(sheetId, tabName) {
-  return new Promise((resolve, reject) => {
-    // Unique callback name to avoid collisions if called in parallel
-    const cbName = '__gviz_' + Date.now() + '_' + Math.random().toString(36).slice(2);
-    const scriptId = cbName;
-
-    const cleanup = () => {
-      delete window[cbName];
-      const s = document.getElementById(scriptId);
-      if (s) s.remove();
-    };
-
-    window[cbName] = (response) => {
-      cleanup();
-      if (!response || !response.table) {
-        reject(new Error(`Tab "${tabName}" no encontrada o sin datos. Verifica que la Sheet está publicada y compartida.`));
-        return;
-      }
-      resolve(parseGvizTable(response.table));
-    };
-
-    const script = document.createElement('script');
-    script.id = scriptId;
-    script.onerror = () => {
-      cleanup();
-      reject(new Error(`No se pudo cargar "${tabName}". Verifica que la Sheet está publicada.`));
-    };
-    // tqx handler parameter tells gviz to call our function instead of google.visualization.Query.setResponse
-    script.src = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json;handler:${cbName}&sheet=${encodeURIComponent(tabName)}`;
-    document.head.appendChild(script);
-  });
+async function fetchTab(sheetId, gid) {
+  const url = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`Error al cargar datos (HTTP ${res.status}). Verifica que la Sheet está compartida como "Cualquiera con el enlace".`);
+  }
+  const text = await res.text();
+  return parseCSV(text);
 }
 
-function parseGvizTable(table) {
-  const cols  = table.cols.map(c => (c.label || c.id).trim().toLowerCase());
-  const types = table.cols.map(c => c.type);
+/**
+ * Parses CSV text into an array of plain objects keyed by the header row.
+ */
+function parseCSV(text) {
+  const lines = text.trim().split('\n');
+  if (lines.length < 2) return [];
 
-  return (table.rows || []).map(row => {
+  const headers = splitCSVLine(lines[0]).map(h => h.trim().toLowerCase());
+
+  return lines.slice(1).map(line => {
+    const values = splitCSVLine(line);
     const obj = {};
-    row.c.forEach((cell, i) => {
-      if (!cell) { obj[cols[i]] = null; return; }
-      // For date columns Google returns v='Date(2026,0,1)' — use f (formatted) instead
-      if (types[i] === 'date' && typeof cell.v === 'string' && cell.v.startsWith('Date(')) {
-        obj[cols[i]] = cell.f ?? null;
-      } else {
-        obj[cols[i]] = cell.v ?? null;
-      }
+    headers.forEach((h, i) => {
+      obj[h] = values[i] !== undefined ? values[i].trim() : null;
     });
     return obj;
   });
+}
+
+/**
+ * Splits a single CSV line respecting quoted fields.
+ */
+function splitCSVLine(line) {
+  const result = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') { current += '"'; i++; }
+      else inQuotes = !inQuotes;
+    } else if (ch === ',' && !inQuotes) {
+      result.push(current);
+      current = '';
+    } else {
+      current += ch;
+    }
+  }
+  result.push(current);
+  return result;
 }
 
 function normalizeRows(rows) {
