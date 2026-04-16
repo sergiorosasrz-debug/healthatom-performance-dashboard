@@ -110,12 +110,19 @@ function parseGviz(text) {
 
   if (!data.table) return [];
 
-  const cols = data.table.cols.map(c => (c.label || c.id).trim().toLowerCase());
+  const cols  = data.table.cols.map(c => (c.label || c.id).trim().toLowerCase());
+  const types = data.table.cols.map(c => c.type);
 
   return (data.table.rows || []).map(row => {
     const obj = {};
     row.c.forEach((cell, i) => {
-      obj[cols[i]] = cell ? cell.v : null;
+      if (!cell) { obj[cols[i]] = null; return; }
+      // For date columns Google returns v='Date(2026,0,1)' — use f (formatted) instead
+      if (types[i] === 'date' && typeof cell.v === 'string' && cell.v.startsWith('Date(')) {
+        obj[cols[i]] = cell.f ?? null;
+      } else {
+        obj[cols[i]] = cell.v ?? null;
+      }
     });
     return obj;
   });
