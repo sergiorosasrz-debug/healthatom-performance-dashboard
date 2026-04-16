@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Performance Dashboard — HealthAtom</title>
+  <meta name="description" content="Dashboard de cumplimiento de KPIs del equipo de Performance — HealthAtom" />
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+  <!-- ── Loading overlay ─────────────────────────────────── -->
+  <div id="loading-overlay" class="loading-overlay">
+    <div class="loading-spinner"></div>
+  </div>
+
+  <!-- ── Sticky Header ──────────────────────────────────── -->
+  <header class="header">
+    <div class="header__inner">
+      <!-- Brand -->
+      <div class="header__brand">
+        <div class="header__logo">HA</div>
+        <div>
+          <div class="header__title">Performance Dashboard</div>
+          <div class="header__subtitle">HealthAtom — Growth &amp; Performance</div>
+        </div>
+      </div>
+
+      <!-- Controls -->
+      <div class="header__controls">
+        <!-- Month selector -->
+        <select id="month-select" class="control-select" aria-label="Seleccionar mes">
+          <option disabled>Cargando...</option>
+        </select>
+
+        <!-- View toggle -->
+        <div class="view-toggle" role="group" aria-label="Vista">
+          <button class="view-btn view-btn--active" data-view="global">Global / Producto</button>
+          <button class="view-btn" data-view="focos">Focos × 11</button>
+        </div>
+
+        <!-- Refresh -->
+        <button id="btn-refresh" class="btn-icon" title="Actualizar datos" aria-label="Actualizar datos">↻</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── Main content ────────────────────────────────────── -->
+  <main class="main">
+
+    <!-- Error banner -->
+    <div id="error-banner" class="error-banner hidden" role="alert"></div>
+
+    <!-- ── Section 1: KPI Summary Cards (global view only) ── -->
+    <section id="kpi-cards-section">
+      <p class="section-label">Resumen del mes — Total</p>
+      <div id="kpi-cards" class="kpi-cards-grid">
+        <!-- Rendered by ui.js -->
+      </div>
+    </section>
+
+    <!-- ── Section 2: Breakdown Table ──────────────────────── -->
+    <section>
+      <p class="section-label" id="table-label">Desglose por segmento</p>
+      <div class="table-wrapper">
+        <table id="breakdown-table" class="breakdown-table" aria-label="Tabla de KPIs">
+          <!-- Rendered by ui.js -->
+        </table>
+      </div>
+    </section>
+
+    <!-- ── Section 3: Historical Charts ────────────────────── -->
+    <section>
+      <div class="charts-controls">
+        <p class="section-label" style="margin-bottom:0">Histórico</p>
+
+        <!-- Global: producto selector -->
+        <div id="chart-controls-global">
+          <select id="producto-select" class="control-select" aria-label="Filtrar por producto">
+            <option value="Total">Total</option>
+            <option value="Dentalink">Dentalink</option>
+            <option value="Medilink">Medilink</option>
+          </select>
+        </div>
+
+        <!-- Focos: foco selector -->
+        <div id="chart-controls-focos" class="hidden">
+          <select id="foco-select" class="control-select" aria-label="Filtrar por foco">
+            <!-- Populated by ui.js -->
+          </select>
+        </div>
+      </div>
+
+      <div class="charts-grid">
+        <div class="chart-card">
+          <canvas id="chart-nmql"></canvas>
+        </div>
+        <div class="chart-card">
+          <canvas id="chart-nmql-cal"></canvas>
+        </div>
+        <div class="chart-card chart-card--wide">
+          <canvas id="chart-nmrr"></canvas>
+        </div>
+        <div class="chart-card">
+          <canvas id="chart-cpl"></canvas>
+        </div>
+        <div class="chart-card">
+          <canvas id="chart-cr"></canvas>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ── Footer ──────────────────────────────────────────── -->
+  <footer class="footer">
+    <span id="last-updated">—</span>
+    <span>·</span>
+    <a id="sheet-link" href="#" target="_blank" rel="noopener">Ver Google Sheet</a>
+    <span>·</span>
+    <span>HealthAtom Performance Team</span>
+  </footer>
+
+  <!-- ── Scripts (order matters) ────────────────────────── -->
+  <script src="js/config.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/charts.js"></script>
+  <script src="js/app.js"></script>
+
+  <!-- Set Sheet link in footer once config is loaded -->
+  <script>
+    const sheetId = CONFIG.SHEET_ID;
+    if (sheetId && sheetId !== 'YOUR_SHEET_ID_HERE') {
+      document.getElementById('sheet-link').href =
+        `https://docs.google.com/spreadsheets/d/${sheetId}/edit`;
+    } else {
+      document.getElementById('sheet-link').style.display = 'none';
+    }
+  </script>
+
+</body>
+</html>
